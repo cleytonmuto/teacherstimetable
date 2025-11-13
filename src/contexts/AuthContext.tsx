@@ -5,6 +5,10 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updatePassword,
+  updateEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import {
@@ -15,19 +19,23 @@ import {
   setDoc,
   doc,
   getDoc,
+  updateDoc,
   Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { formatCPF, validateCPF } from '../utils/cpfUtils';
+import { validatePassword } from '../utils/passwordUtils';
 import { initializeUsersCollection } from '../utils/firestoreInit';
 
 interface AuthContextType {
   currentUser: User | null;
   login: (cpf: string, password: string) => Promise<void>;
-  register: (cpf: string, password: string) => Promise<void>;
+  register: (cpf: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (updates: { name?: string; cpf?: string; password?: string; currentPassword?: string }) => Promise<void>;
   loading: boolean;
   userCPF: string | null;
+  userName: string | null;
   userProfile: 'regular' | 'coordinator' | null;
 }
 
@@ -48,6 +56,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userCPF, setUserCPF] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<'regular' | 'coordinator' | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -74,7 +83,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return userData.internalId || userData.email || null;
   };
 
-  // Load user CPF and profile when user is authenticated
+  // Load user CPF, name, and profile when user is authenticated
   const loadUserData = async (userId: string) => {
     try {
       // First try direct document lookup using userId as document ID (preferred method)
@@ -82,6 +91,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         setUserCPF(userData.cpf || null);
+        setUserName(userData.name || null);
         setUserProfile(userData.profile || 'regular');
         return;
       }
@@ -93,6 +103,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data();
         setUserCPF(userData.cpf || null);
+        setUserName(userData.name || null);
         setUserProfile(userData.profile || 'regular');
       }
     } catch (error) {
@@ -101,9 +112,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const register = async (cpf: string, password: string) => {
+  const register = async (cpf: string, password: string, name: string) => {
     if (!validateCPF(cpf)) {
       throw new Error('CPF inválido. Verifique se o CPF está correto.');
+    }
+
+    // Validate password
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      throw new Error(passwordValidation.errors.join('. '));
     }
 
     const cleanedCPF = formatCPF(cpf);
@@ -153,6 +170,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       await setDoc(userDocRef, {
         userId: userId,
         cpf: cleanedCPF,
+        name: name.trim(),
         internalId: internalIdentifier, // Internal identifier for Firebase Auth (not shown to users)
         profile: 'regular', // Default profile is 'regular'
         createdAt: Timestamp.now(),
@@ -247,7 +265,118 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = async () => {
     await signOut(auth);
     setUserCPF(null);
+    setUserName(null);
     setUserProfile(null);
+  };
+
+  const updateProfile = async (updates: { name?: string; cpf?: string; password?: string; currentPassword?: string }) => {
+    if (!currentUser) {
+      throw new Error('Usuário não autenticado.');
+    }
+
+    const userId = currentUser.uid;
+    const userDocRef = doc(db, 'users', userId);
+    const updateData: any = { updatedAt: Timestamp.now() };
+    let needsReauth = false;
+
+    // Update name if provided
+    if (updates.name !== undefined) {
+      if (!updates.name.trim()) {
+        throw new Error('O nome não pode estar vazio.');
+      }
+      updateData.name = updates.name.trim();
+    }
+
+    // Update CPF if provided
+    if (updates.cpf !== undefined) {
+      const newCPF = updates.cpf.replace(/\D/g, '');
+      if (!validateCPF(newCPF)) {
+        throw new Error('CPF inválido. Verifique se o CPF está correto.');
+      }
+      
+      const cleanedCPF = formatCPF(newCPF);
+      
+      // Check if new CPF is already taken by another user
+      const q = query(collection(db, 'users'), where('cpf', '==', cleanedCPF));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const existingUser = querySnapshot.docs[0];
+        // If it's not the current user, it's taken
+        if (existingUser.id !== userId) {
+          throw new Error('Este CPF já está cadastrado por outro usuário.');
+        }
+      }
+
+      // If CPF changed, we need to update the internal identifier
+      if (cleanedCPF !== userCPF) {
+        const newInternalIdentifier = generateInternalIdentifier(cleanedCPF);
+        updateData.cpf = cleanedCPF;
+        updateData.internalId = newInternalIdentifier;
+        needsReauth = true;
+      }
+    }
+
+    // Update password if provided
+    if (updates.password !== undefined && updates.password) {
+      const passwordValidation = validatePassword(updates.password);
+      if (!passwordValidation.valid) {
+        throw new Error(passwordValidation.errors.join('. '));
+      }
+      if (!updates.currentPassword) {
+        throw new Error('É necessário informar a senha atual para alterar a senha.');
+      }
+      needsReauth = true;
+    }
+
+    // Re-authenticate if needed (for password or CPF changes)
+    if (needsReauth && updates.currentPassword) {
+      const userDoc = await getDoc(userDocRef);
+      const userData = userDoc.data();
+      const currentInternalId = userData?.internalId;
+      if (!currentInternalId) {
+        throw new Error('Não foi possível verificar a autenticação. Faça login novamente.');
+      }
+
+      const credential = EmailAuthProvider.credential(currentInternalId, updates.currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+    } else if (needsReauth) {
+      throw new Error('É necessário informar a senha atual para realizar esta alteração.');
+    }
+
+    // Update Firebase Auth email if CPF changed
+    if (updates.cpf !== undefined && updateData.internalId) {
+      try {
+        await updateEmail(currentUser, updateData.internalId);
+      } catch (error: any) {
+        console.error('Error updating email:', error);
+        throw new Error('Erro ao atualizar CPF. Tente novamente.');
+      }
+    }
+
+    // Update password if provided
+    if (updates.password && updates.currentPassword) {
+      try {
+        await updatePassword(currentUser, updates.password);
+      } catch (error: any) {
+        console.error('Error updating password:', error);
+        if (error.code === 'auth/requires-recent-login') {
+          throw new Error('Por segurança, faça login novamente antes de alterar a senha.');
+        }
+        throw new Error('Erro ao atualizar senha. Tente novamente.');
+      }
+    }
+
+    // Update Firestore document
+    try {
+      await updateDoc(userDocRef, updateData);
+      
+      // Reload user data to reflect changes
+      await loadUserData(userId);
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      throw new Error('Erro ao atualizar perfil. Tente novamente.');
+    }
   };
 
   useEffect(() => {
@@ -273,6 +402,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await loadUserData(user.uid);
       } else {
         setUserCPF(null);
+        setUserName(null);
         setUserProfile(null);
       }
       setLoading(false);
@@ -286,8 +416,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     login,
     register,
     logout,
+    updateProfile,
     loading,
     userCPF,
+    userName,
     userProfile,
   };
 

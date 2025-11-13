@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { db } from '../config/firebase';
-import { displayCPF } from '../utils/cpfUtils';
+import { displayCPF, formatCPF, validateCPF } from '../utils/cpfUtils';
+import { validatePassword } from '../utils/passwordUtils';
 import {
   collection,
   query,
@@ -37,7 +38,7 @@ interface Room {
   createdAt: Timestamp;
 }
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const TIME_SLOTS = [
   '08:00-09:00',
   '09:00-10:00',
@@ -51,7 +52,7 @@ const TIME_SLOTS = [
 ];
 
 export default function Dashboard() {
-  const { currentUser, logout, userCPF } = useAuth();
+  const { currentUser, logout, userName, userCPF, updateProfile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -61,6 +62,13 @@ export default function Dashboard() {
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; time: string } | null>(null);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ subject: '', room: '' });
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileData, setProfileData] = useState({ name: '', cpf: '', password: '', currentPassword: '' });
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [cpfError, setCpfError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     if (currentUser) {
@@ -232,6 +240,100 @@ export default function Dashboard() {
     }
   };
 
+  const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    value = value.replace(/\D/g, '');
+    if (value.length <= 11) {
+      setProfileData({ ...profileData, cpf: value });
+      setCpfError('');
+      setProfileError('');
+    }
+  };
+
+  useEffect(() => {
+    if (profileData.cpf.length === 11) {
+      if (!validateCPF(profileData.cpf)) {
+        setCpfError('CPF inválido. Verifique se o CPF está correto.');
+      } else {
+        setCpfError('');
+      }
+    } else if (profileData.cpf.length > 0 && profileData.cpf.length < 11) {
+      setCpfError('');
+    }
+  }, [profileData.cpf]);
+
+  useEffect(() => {
+    if (profileData.password) {
+      const passwordValidation = validatePassword(profileData.password);
+      if (!passwordValidation.valid) {
+        setPasswordError(passwordValidation.errors.join('. '));
+      } else {
+        setPasswordError('');
+      }
+    } else {
+      setPasswordError('');
+    }
+  }, [profileData.password]);
+
+  const handleProfileUpdate = async () => {
+    setProfileError('');
+    setProfileSuccess('');
+    setProfileLoading(true);
+
+    try {
+      const updates: { name?: string; cpf?: string; password?: string; currentPassword?: string } = {};
+
+      // Only include fields that have changed
+      if (profileData.name.trim() !== (userName || '')) {
+        updates.name = profileData.name;
+      }
+
+      if (profileData.cpf && profileData.cpf.length === 11 && formatCPF(profileData.cpf) !== userCPF) {
+        if (!validateCPF(profileData.cpf)) {
+          throw new Error('CPF inválido. Verifique se o CPF está correto.');
+        }
+        updates.cpf = profileData.cpf;
+      }
+
+      if (profileData.password) {
+        // Validation is already done in useEffect, but double-check here
+        if (passwordError) {
+          setProfileLoading(false);
+          return;
+        }
+        updates.password = profileData.password;
+      }
+
+      // If password or CPF is being changed, current password is required
+      if (updates.password || updates.cpf) {
+        if (!profileData.currentPassword) {
+          throw new Error('É necessário informar a senha atual para alterar a senha ou CPF.');
+        }
+        updates.currentPassword = profileData.currentPassword;
+      }
+
+      // Check if there are any changes
+      if (Object.keys(updates).length === 0 || (Object.keys(updates).length === 1 && updates.currentPassword)) {
+        setProfileError('Nenhuma alteração foi feita.');
+        setProfileLoading(false);
+        return;
+      }
+
+      await updateProfile(updates);
+      setProfileSuccess('Perfil atualizado com sucesso!');
+      setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+      setPasswordError('');
+      setTimeout(() => {
+        setShowProfileModal(false);
+        setProfileSuccess('');
+      }, 1500);
+    } catch (error: any) {
+      setProfileError(error.message || 'Erro ao atualizar perfil. Tente novamente.');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -247,8 +349,22 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Teachers Timetable Dashboard</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm opacity-90">
-              {userCPF ? `CPF: ${displayCPF(userCPF)}` : 'Usuário'}
+              {userName || (userCPF ? displayCPF(userCPF) : 'Usuário')}
             </span>
+            <button
+              onClick={() => {
+                setProfileData({ name: userName || '', cpf: userCPF || '', password: '', currentPassword: '' });
+                setProfileError('');
+                setProfileSuccess('');
+                setCpfError('');
+                setPasswordError('');
+                setShowProfileModal(true);
+              }}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors font-medium text-sm"
+              title="Editar perfil"
+            >
+              Perfil
+            </button>
             <button
               onClick={toggleTheme}
               className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-xl"
@@ -408,6 +524,156 @@ export default function Dashboard() {
                 disabled={subjects.length === 0 || rooms.length === 0}
               >
                 {editingSlotId ? 'Atualizar' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProfileModal && (
+        <div
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            setShowProfileModal(false);
+            setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+            setProfileError('');
+            setProfileSuccess('');
+            setCpfError('');
+            setPasswordError('');
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              Editar Perfil
+            </h2>
+
+            {profileError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
+                {profileError}
+              </div>
+            )}
+
+            {profileSuccess && (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm">
+                {profileSuccess}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Nome Completo
+                </label>
+                <input
+                  type="text"
+                  value={profileData.name}
+                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                  placeholder="Digite seu nome completo"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  CPF
+                </label>
+                <input
+                  type="text"
+                  value={displayCPF(profileData.cpf)}
+                  onChange={handleCPFChange}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all ${
+                    cpfError
+                      ? 'border-red-500 dark:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                />
+                {cpfError && (
+                  <div className="mt-1 text-xs text-red-600 dark:text-red-400">{cpfError}</div>
+                )}
+                {profileData.cpf.length === 11 && !cpfError && (
+                  <div className="mt-1 text-xs text-green-600 dark:text-green-400">CPF válido</div>
+                )}
+                <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Deixe em branco para manter o CPF atual
+                </small>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Nova Senha
+                </label>
+                <input
+                  type="password"
+                  value={profileData.password}
+                  onChange={(e) => {
+                    setProfileData({ ...profileData, password: e.target.value });
+                    setPasswordError('');
+                    setProfileError('');
+                  }}
+                  placeholder="Mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número, 1 símbolo"
+                  minLength={8}
+                  className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all ${
+                    passwordError
+                      ? 'border-red-500 dark:border-red-500'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                />
+                <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Deixe em branco para manter a senha atual. A senha deve ter pelo menos 8 caracteres, incluindo 1 maiúscula, 1 minúscula, 1 número e 1 símbolo
+                </small>
+                {passwordError && (
+                  <div className="mt-1 text-xs text-red-600 dark:text-red-400">{passwordError}</div>
+                )}
+                {profileData.password && !passwordError && validatePassword(profileData.password).valid && (
+                  <div className="mt-1 text-xs text-green-600 dark:text-green-400">Senha válida</div>
+                )}
+              </div>
+
+              {(profileData.password || (profileData.cpf && profileData.cpf.length === 11 && formatCPF(profileData.cpf) !== userCPF)) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Senha Atual *
+                  </label>
+                  <input
+                    type="password"
+                    value={profileData.currentPassword}
+                    onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
+                    placeholder="Digite sua senha atual"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                  />
+                  <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Necessário para alterar senha ou CPF
+                  </small>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowProfileModal(false);
+                  setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+                  setProfileError('');
+                  setProfileSuccess('');
+                  setCpfError('');
+                  setPasswordError('');
+                }}
+                className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleProfileUpdate}
+                disabled={profileLoading || !!cpfError || !!passwordError}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {profileLoading ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>

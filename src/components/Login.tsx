@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { displayCPF, validateCPF } from '../utils/cpfUtils';
+import { validatePassword } from '../utils/passwordUtils';
 
 export default function Login() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [cpf, setCPF] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [cpfError, setCpfError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const { login, register, currentUser } = useAuth();
@@ -58,7 +61,21 @@ export default function Login() {
         // Navigation will happen automatically via useEffect when currentUser changes
       } else {
         // Registration
-        await register(cpf, password);
+        if (!name.trim()) {
+          setError('Por favor, informe seu nome.');
+          setLoading(false);
+          return;
+        }
+        
+        // Validate password
+        const passwordValidation = validatePassword(password);
+        if (!passwordValidation.valid) {
+          setPasswordError(passwordValidation.errors.join('. '));
+          setLoading(false);
+          return;
+        }
+        
+        await register(cpf, password, name.trim());
         setSuccessMessage('Cadastro realizado com sucesso! Redirecionando...');
         // Wait a bit to show success message, then navigate
         // The user should be automatically logged in via onAuthStateChanged
@@ -136,25 +153,58 @@ export default function Login() {
             )}
           </div>
 
+          {!isLogin && (
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Nome Completo *
+              </label>
+              <input
+                id="name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                placeholder="Digite seu nome completo"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+              />
+            </div>
+          )}
+
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Senha
+              Senha {!isLogin && '*'}
             </label>
             <input
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setPasswordError('');
+                setError('');
+              }}
               required
-              placeholder="Digite sua senha"
-              minLength={6}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+              placeholder={isLogin ? "Digite sua senha" : "Mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número, 1 símbolo"}
+              minLength={!isLogin ? 8 : 6}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 ${
+                passwordError
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
             />
+            {!isLogin && (
+              <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                A senha deve ter pelo menos 8 caracteres, incluindo 1 maiúscula, 1 minúscula, 1 número e 1 símbolo
+              </small>
+            )}
+            {passwordError && (
+              <div className="mt-1 text-xs text-red-600 dark:text-red-400">{passwordError}</div>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={loading || (!isLogin && cpf.length === 11 && !!cpfError)}
+            disabled={loading || (!isLogin && ((cpf.length === 11 && !!cpfError) || !!passwordError))}
             className="w-full py-3 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             {loading ? 'Carregando...' : isLogin ? 'Entrar' : 'Cadastrar'}
@@ -169,8 +219,10 @@ export default function Login() {
               setIsLogin(!isLogin);
               setError('');
               setCpfError('');
+              setPasswordError('');
               setCPF('');
               setPassword('');
+              setName('');
             }}
             className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold underline"
           >
