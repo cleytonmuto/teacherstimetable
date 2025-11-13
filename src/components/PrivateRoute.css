@@ -1,0 +1,12 @@
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.loading {
+  font-size: 18px;
+  color: #666;
+}
