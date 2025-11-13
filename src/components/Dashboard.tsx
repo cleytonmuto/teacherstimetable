@@ -63,12 +63,13 @@ export default function Dashboard() {
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ subject: '', room: '' });
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [profileData, setProfileData] = useState({ name: '', cpf: '', password: '', currentPassword: '' });
+  const [profileData, setProfileData] = useState({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [cpfError, setCpfError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   useEffect(() => {
     if (currentUser) {
@@ -275,6 +276,18 @@ export default function Dashboard() {
     }
   }, [profileData.password]);
 
+  useEffect(() => {
+    if (profileData.confirmPassword) {
+      if (profileData.password !== profileData.confirmPassword) {
+        setConfirmPasswordError('As senhas não coincidem');
+      } else {
+        setConfirmPasswordError('');
+      }
+    } else {
+      setConfirmPasswordError('');
+    }
+  }, [profileData.confirmPassword, profileData.password]);
+
   const handleProfileUpdate = async () => {
     setProfileError('');
     setProfileSuccess('');
@@ -301,6 +314,11 @@ export default function Dashboard() {
           setProfileLoading(false);
           return;
         }
+        if (profileData.password !== profileData.confirmPassword) {
+          setConfirmPasswordError('As senhas não coincidem');
+          setProfileLoading(false);
+          return;
+        }
         updates.password = profileData.password;
       }
 
@@ -321,8 +339,9 @@ export default function Dashboard() {
 
       await updateProfile(updates);
       setProfileSuccess('Perfil atualizado com sucesso!');
-      setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+      setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
       setPasswordError('');
+      setConfirmPasswordError('');
       setTimeout(() => {
         setShowProfileModal(false);
         setProfileSuccess('');
@@ -353,11 +372,12 @@ export default function Dashboard() {
             </span>
             <button
               onClick={() => {
-                setProfileData({ name: userName || '', cpf: userCPF || '', password: '', currentPassword: '' });
+                setProfileData({ name: userName || '', cpf: userCPF || '', currentPassword: '', password: '', confirmPassword: '' });
                 setProfileError('');
                 setProfileSuccess('');
                 setCpfError('');
                 setPasswordError('');
+                setConfirmPasswordError('');
                 setShowProfileModal(true);
               }}
               className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors font-medium text-sm"
@@ -535,11 +555,12 @@ export default function Dashboard() {
           className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
           onClick={() => {
             setShowProfileModal(false);
-            setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+            setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
             setProfileError('');
             setProfileSuccess('');
             setCpfError('');
             setPasswordError('');
+            setConfirmPasswordError('');
           }}
         >
           <div
@@ -658,11 +679,12 @@ export default function Dashboard() {
               <button
                 onClick={() => {
                   setShowProfileModal(false);
-                  setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+                  setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
                   setProfileError('');
                   setProfileSuccess('');
                   setCpfError('');
                   setPasswordError('');
+                  setConfirmPasswordError('');
                 }}
                 className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
               >
@@ -670,7 +692,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={handleProfileUpdate}
-                disabled={profileLoading || !!cpfError || !!passwordError}
+                disabled={profileLoading || !!cpfError || !!passwordError || !!confirmPasswordError}
                 className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {profileLoading ? 'Salvando...' : 'Salvar'}

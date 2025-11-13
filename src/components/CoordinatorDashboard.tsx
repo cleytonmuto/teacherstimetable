@@ -84,12 +84,13 @@ export default function CoordinatorDashboard() {
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [newSlotFormData, setNewSlotFormData] = useState({ teacherId: '', subject: '', room: '' });
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [profileData, setProfileData] = useState({ name: '', cpf: '', password: '', currentPassword: '' });
+  const [profileData, setProfileData] = useState({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   const [cpfError, setCpfError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
   useEffect(() => {
     loadSubjects();
@@ -442,6 +443,18 @@ export default function CoordinatorDashboard() {
     }
   }, [profileData.password]);
 
+  useEffect(() => {
+    if (profileData.confirmPassword) {
+      if (profileData.password !== profileData.confirmPassword) {
+        setConfirmPasswordError('As senhas não coincidem');
+      } else {
+        setConfirmPasswordError('');
+      }
+    } else {
+      setConfirmPasswordError('');
+    }
+  }, [profileData.confirmPassword, profileData.password]);
+
   const handleProfileUpdate = async () => {
     setProfileError('');
     setProfileSuccess('');
@@ -468,6 +481,11 @@ export default function CoordinatorDashboard() {
           setProfileLoading(false);
           return;
         }
+        if (profileData.password !== profileData.confirmPassword) {
+          setConfirmPasswordError('As senhas não coincidem');
+          setProfileLoading(false);
+          return;
+        }
         updates.password = profileData.password;
       }
 
@@ -488,8 +506,9 @@ export default function CoordinatorDashboard() {
 
       await updateProfile(updates);
       setProfileSuccess('Perfil atualizado com sucesso!');
-      setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+      setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
       setPasswordError('');
+      setConfirmPasswordError('');
       setTimeout(() => {
         setShowProfileModal(false);
         setProfileSuccess('');
@@ -567,11 +586,12 @@ export default function CoordinatorDashboard() {
             </span>
             <button
               onClick={() => {
-                setProfileData({ name: userName || '', cpf: userCPF || '', password: '', currentPassword: '' });
+                setProfileData({ name: userName || '', cpf: userCPF || '', currentPassword: '', password: '', confirmPassword: '' });
                 setProfileError('');
                 setProfileSuccess('');
                 setCpfError('');
                 setPasswordError('');
+                setConfirmPasswordError('');
                 setShowProfileModal(true);
               }}
               className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors font-medium text-sm"
@@ -1212,11 +1232,12 @@ export default function CoordinatorDashboard() {
           className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
           onClick={() => {
             setShowProfileModal(false);
-            setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+            setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
             setProfileError('');
             setProfileSuccess('');
             setCpfError('');
             setPasswordError('');
+            setConfirmPasswordError('');
           }}
         >
           <div
@@ -1280,6 +1301,25 @@ export default function CoordinatorDashboard() {
                 </small>
               </div>
 
+              {(profileData.password || (profileData.cpf && profileData.cpf.length === 11 && formatCPF(profileData.cpf) !== userCPF)) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Senha Atual *
+                  </label>
+                  <input
+                    type="password"
+                    value={profileData.currentPassword}
+                    onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
+                    placeholder="Digite sua senha atual"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                  />
+                  <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Necessário para alterar senha ou CPF
+                  </small>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nova Senha
@@ -1311,22 +1351,33 @@ export default function CoordinatorDashboard() {
                 )}
               </div>
 
-              {(profileData.password || (profileData.cpf && profileData.cpf.length === 11 && formatCPF(profileData.cpf) !== userCPF)) && (
+              {profileData.password && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Senha Atual *
+                    Confirmar Nova Senha
                   </label>
                   <input
                     type="password"
-                    value={profileData.currentPassword}
-                    onChange={(e) => setProfileData({ ...profileData, currentPassword: e.target.value })}
-                    placeholder="Digite sua senha atual"
-                    required
-                    className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all"
+                    value={profileData.confirmPassword}
+                    onChange={(e) => {
+                      setProfileData({ ...profileData, confirmPassword: e.target.value });
+                      setConfirmPasswordError('');
+                      setProfileError('');
+                    }}
+                    placeholder="Digite a nova senha novamente"
+                    minLength={8}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all ${
+                      confirmPasswordError
+                        ? 'border-red-500 dark:border-red-500'
+                        : 'border-gray-300 dark:border-gray-600'
+                    }`}
                   />
-                  <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Necessário para alterar senha ou CPF
-                  </small>
+                  {confirmPasswordError && (
+                    <div className="mt-1 text-xs text-red-600 dark:text-red-400">{confirmPasswordError}</div>
+                  )}
+                  {profileData.confirmPassword && !confirmPasswordError && profileData.password === profileData.confirmPassword && (
+                    <div className="mt-1 text-xs text-green-600 dark:text-green-400">Senhas coincidem</div>
+                  )}
                 </div>
               )}
             </div>
@@ -1335,11 +1386,12 @@ export default function CoordinatorDashboard() {
               <button
                 onClick={() => {
                   setShowProfileModal(false);
-                  setProfileData({ name: '', cpf: '', password: '', currentPassword: '' });
+                  setProfileData({ name: '', cpf: '', currentPassword: '', password: '', confirmPassword: '' });
                   setProfileError('');
                   setProfileSuccess('');
                   setCpfError('');
                   setPasswordError('');
+                  setConfirmPasswordError('');
                 }}
                 className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
               >
@@ -1347,7 +1399,7 @@ export default function CoordinatorDashboard() {
               </button>
               <button
                 onClick={handleProfileUpdate}
-                disabled={profileLoading || !!cpfError || !!passwordError}
+                disabled={profileLoading || !!cpfError || !!passwordError || !!confirmPasswordError}
                 className="flex-1 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white rounded-lg font-medium shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {profileLoading ? 'Salvando...' : 'Salvar'}
