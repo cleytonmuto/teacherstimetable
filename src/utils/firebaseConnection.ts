@@ -20,9 +20,6 @@ export const testAuthConnection = async (): Promise<boolean> => {
       return false;
     }
     
-    // Try to get current user (this will work even if no user is logged in)
-    const currentUser = auth.currentUser;
-    
     // If auth object exists, connection is working
     return true;
   } catch (error) {
@@ -46,7 +43,7 @@ export const testFirestoreConnection = async (): Promise<{ success: boolean; err
     
     try {
       // Try to read the document (will return empty if it doesn't exist, which is fine)
-      const docSnap = await getDoc(testDocRef);
+      await getDoc(testDocRef);
       
       // If we can read (even if empty), Firestore is connected
       // Now try a write operation to test full functionality

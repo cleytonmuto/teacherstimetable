@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCPF, displayCPF, validateCPF } from '../utils/cpfUtils';
-import './Login.css';
+import { displayCPF, validateCPF } from '../utils/cpfUtils';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -77,36 +76,41 @@ export default function Login() {
   };
 
   return (
-    <div className="login-container">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 via-primary-600 to-purple-600 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
       {import.meta.env.DEV && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 10, 
-          right: 10, 
-          background: '#667eea', 
-          color: 'white', 
-          padding: '8px 12px', 
-          borderRadius: '6px',
-          fontSize: '12px',
-          zIndex: 1000
-        }}>
-          <Link to="/firebase-status" style={{ color: 'white', textDecoration: 'none' }}>
-            🔍 Check Firebase Status
-          </Link>
-        </div>
+        <Link
+          to="/firebase-status"
+          className="fixed top-4 right-4 bg-primary-500 hover:bg-primary-600 text-white px-3 py-2 rounded-lg text-xs font-medium shadow-lg transition-colors z-50"
+        >
+          🔍 Check Firebase Status
+        </Link>
       )}
-      <div className="login-card">
-        <h1 className="login-title">Teachers Timetable</h1>
-        <h2 className="login-subtitle">
-          {isLogin ? 'Login' : 'Cadastro'}
-        </h2>
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 md:p-10">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            Teachers Timetable
+          </h1>
+          <h2 className="text-xl text-gray-600 dark:text-gray-300 font-medium">
+            {isLogin ? 'Login' : 'Cadastro'}
+          </h2>
+        </div>
 
-        {error && <div className="error-message">{error}</div>}
-        {successMessage && <div className="success-message">{successMessage}</div>}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm">
+            {successMessage}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="cpf">CPF</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="cpf" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              CPF
+            </label>
             <input
               id="cpf"
               type="text"
@@ -115,17 +119,27 @@ export default function Login() {
               required
               placeholder="000.000.000-00"
               maxLength={14}
-              className={cpfError ? 'input-error' : ''}
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 ${
+                cpfError
+                  ? 'border-red-500 dark:border-red-500'
+                  : 'border-gray-300 dark:border-gray-600'
+              }`}
             />
-            <small className="form-hint">Digite apenas os números do CPF</small>
-            {cpfError && <div className="field-error">{cpfError}</div>}
+            <small className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Digite apenas os números do CPF
+            </small>
+            {cpfError && (
+              <div className="mt-1 text-xs text-red-600 dark:text-red-400">{cpfError}</div>
+            )}
             {!isLogin && cpf.length === 11 && !cpfError && (
-              <div className="field-success">CPF válido</div>
+              <div className="mt-1 text-xs text-green-600 dark:text-green-400">CPF válido</div>
             )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Senha</label>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Senha
+            </label>
             <input
               id="password"
               type="password"
@@ -134,35 +148,34 @@ export default function Login() {
               required
               placeholder="Digite sua senha"
               minLength={6}
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading || (!isLogin && cpf.length === 11 && !!cpfError)}
-            className="submit-button"
+            className="w-full py-3 bg-gradient-to-r from-primary-500 to-purple-600 hover:from-primary-600 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             {loading ? 'Carregando...' : isLogin ? 'Entrar' : 'Cadastrar'}
           </button>
         </form>
 
-        <div className="toggle-form">
-          <p>
-            {isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? '}
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-                setCpfError('');
-                setCPF('');
-                setPassword('');
-              }}
-              className="toggle-button"
-            >
-              {isLogin ? 'Cadastrar' : 'Entrar'}
-            </button>
-          </p>
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+          {isLogin ? 'Não tem uma conta? ' : 'Já tem uma conta? '}
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setCpfError('');
+              setCPF('');
+              setPassword('');
+            }}
+            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-semibold underline"
+          >
+            {isLogin ? 'Cadastrar' : 'Entrar'}
+          </button>
         </div>
       </div>
     </div>

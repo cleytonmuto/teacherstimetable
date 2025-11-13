@@ -5,9 +5,12 @@ A React application for managing teachers' weekly timetables. Teachers can log i
 ## Features
 
 - 🔐 User authentication (Login/Register) with Firebase Auth
-- 📅 Weekly timetable view (Monday to Friday)
+- 👥 Two user profiles: Regular teachers and Coordinators
+- 📅 Weekly timetable view (Monday to Saturday)
 - ⏰ Time slots from 8:00 AM to 5:00 PM
 - ➕ Add, view, and delete timetable entries
+- 📚 Subject management (Coordinators can register subjects)
+- 👀 View all teachers' timetables (Coordinators only)
 - 💾 Data persistence with Firebase Firestore
 - 🎨 Modern, responsive UI
 
@@ -78,9 +81,23 @@ service cloud.firestore {
     }
     
     // Timetable collection - users can only access their own entries
+    // Coordinators can read all entries
     match /timetable/{documentId} {
+      // Coordinators can read all timetables
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'coordinator';
+      // Regular users can only access their own entries
       allow read, write, delete: if request.auth != null && request.auth.uid == resource.data.teacherId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.teacherId;
+    }
+    
+    // Subjects collection - coordinators can manage, all authenticated users can read
+    match /subjects/{subjectId} {
+      // Coordinators can create, update, and delete subjects
+      allow create, update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'coordinator';
+      // All authenticated users can read subjects
+      allow read: if request.auth != null;
     }
   }
 }
@@ -92,10 +109,36 @@ service cloud.firestore {
   - `userId`: Firebase Auth user ID (also used as document ID)
   - `cpf`: User's CPF (11 digits, no formatting)
   - `internalId`: Internal identifier for Firebase Auth (not shown to users)
+  - `profile`: User profile type - `'regular'` (default) or `'coordinator'`
   - `createdAt`: Registration timestamp (Firestore Timestamp)
   - `updatedAt`: Last update timestamp (Firestore Timestamp)
   
   **Note**: Firebase Authentication requires an email format internally, but the application only uses CPF for user authentication. The internal identifier is automatically generated and stored but is never displayed to users.
+
+### User Profiles
+
+The application supports two user profiles:
+
+1. **Regular Teacher** (default):
+   - Can view and manage their own timetable
+   - Can add time slots with subjects from the registered subjects list
+   - Default profile for all new registrations
+
+2. **Coordinator**:
+   - Can register and manage subjects
+   - Can view timetables of all registered teachers
+   - Can filter timetables by specific teacher
+   - Must be manually set in Firestore
+
+**To set a user as Coordinator:**
+
+1. Go to Firebase Console > Firestore Database
+2. Navigate to the `users` collection
+3. Find the user document (by their `userId`)
+4. Edit the document and set the `profile` field to `"coordinator"`
+5. Save the changes
+
+The user will see the Coordinator Dashboard on their next login.
 
 **Application Initialization (On App Start):**
 1. Verifies Firestore connection

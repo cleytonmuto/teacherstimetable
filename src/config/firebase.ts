@@ -1,7 +1,7 @@
-import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
 import type { FirebaseOptions } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // Validate environment variables
 const requiredEnvVars = {
@@ -33,34 +33,16 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-
-  // Log successful initialization (only in development)
-  if (import.meta.env.DEV) {
-    console.log('✅ Firebase initialized successfully');
-    console.log('📦 Project ID:', firebaseConfig.projectId);
-    console.log('🔑 Auth Domain:', firebaseConfig.authDomain);
-    console.log('💾 Storage Bucket:', firebaseConfig.storageBucket);
-  }
-} catch (error: any) {
-  console.error('❌ Firebase initialization failed:', error);
-  console.error('Error details:', {
-    code: error?.code,
-    message: error?.message,
-    stack: error?.stack,
-  });
-  
-  // Don't throw in production to allow app to load, but log the error
-  if (import.meta.env.DEV) {
-    throw new Error(`Failed to initialize Firebase: ${error?.message || 'Unknown error'}`);
-  }
+// Log successful initialization (only in development)
+if (import.meta.env.DEV) {
+  console.log('✅ Firebase initialized successfully');
+  console.log('📦 Project ID:', firebaseConfig.projectId);
+  console.log('🔑 Auth Domain:', firebaseConfig.authDomain);
+  console.log('💾 Storage Bucket:', firebaseConfig.storageBucket);
 }
 
 export { auth, db };

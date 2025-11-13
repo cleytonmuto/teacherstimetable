@@ -1,11 +1,12 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
-  User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import {
   collection,
   query,
@@ -27,6 +28,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   userCPF: string | null;
+  userProfile: 'regular' | 'coordinator' | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +48,7 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userCPF, setUserCPF] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<'regular' | 'coordinator' | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Generate internal identifier from CPF for Firebase Auth
@@ -71,14 +74,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return userData.internalId || userData.email || null;
   };
 
-  // Load user CPF when user is authenticated
-  const loadUserCPF = async (userId: string) => {
+  // Load user CPF and profile when user is authenticated
+  const loadUserData = async (userId: string) => {
     try {
       // First try direct document lookup using userId as document ID (preferred method)
       const userDoc = await getDoc(doc(db, 'users', userId));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         setUserCPF(userData.cpf || null);
+        setUserProfile(userData.profile || 'regular');
         return;
       }
       
@@ -89,10 +93,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data();
         setUserCPF(userData.cpf || null);
+        setUserProfile(userData.profile || 'regular');
       }
     } catch (error) {
-      console.error('Error loading user CPF:', error);
-      // Don't throw - allow user to continue even if CPF can't be loaded
+      console.error('Error loading user data:', error);
+      // Don't throw - allow user to continue even if data can't be loaded
     }
   };
 
@@ -139,6 +144,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.log('✅ Firebase Auth account created:', userId);
 
       // Step 2: Store teacher data in Firestore using userId as document ID
+      if (!userId) {
+        throw new Error('User ID não foi criado corretamente.');
+      }
       const userDocRef = doc(db, 'users', userId);
       console.log('Saving teacher data to Firestore...');
       
@@ -146,6 +154,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         userId: userId,
         cpf: cleanedCPF,
         internalId: internalIdentifier, // Internal identifier for Firebase Auth (not shown to users)
+        profile: 'regular', // Default profile is 'regular'
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       }, { merge: false }); // merge: false ensures we don't overwrite existing data
@@ -170,8 +179,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.log('📄 User document ID:', userId);
       console.log('📄 User data:', userData);
 
-      // Set user CPF in state (user should be automatically logged in via onAuthStateChanged)
+      // Set user CPF and profile in state (user should be automatically logged in via onAuthStateChanged)
       setUserCPF(cleanedCPF);
+      setUserProfile('regular');
 
       // Return success - user will be automatically logged in by onAuthStateChanged
       return;
@@ -227,16 +237,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Authenticate with Firebase using the internal identifier
     await signInWithEmailAndPassword(auth, internalIdentifier, password);
     
-    // Load user CPF after successful login
+    // Load user data after successful login
     const user = auth.currentUser;
     if (user) {
-      await loadUserCPF(user.uid);
+      await loadUserData(user.uid);
     }
   };
 
   const logout = async () => {
     await signOut(auth);
     setUserCPF(null);
+    setUserProfile(null);
   };
 
   useEffect(() => {
@@ -259,9 +270,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        await loadUserCPF(user.uid);
+        await loadUserData(user.uid);
       } else {
         setUserCPF(null);
+        setUserProfile(null);
       }
       setLoading(false);
     });
@@ -276,6 +288,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     logout,
     loading,
     userCPF,
+    userProfile,
   };
 
   return (

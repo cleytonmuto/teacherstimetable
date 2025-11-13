@@ -30,6 +30,27 @@
   opacity: 0.9;
 }
 
+.theme-toggle-button {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition: background 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+}
+
+.theme-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .logout-button {
   padding: 8px 16px;
   background: rgba(255, 255, 255, 0.2);
@@ -65,10 +86,10 @@
 }
 
 .timetable th {
-  padding: 15px;
+  padding: 12px 8px;
   text-align: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .timetable th:first-child {
@@ -79,7 +100,7 @@
   padding: 0;
   border: 1px solid #e0e0e0;
   min-height: 80px;
-  min-width: 150px;
+  min-width: 120px;
   cursor: pointer;
   transition: background 0.2s;
   position: relative;
@@ -99,10 +120,10 @@
 }
 
 .empty-slot {
-  padding: 20px;
+  padding: 15px;
   text-align: center;
   color: #999;
-  font-size: 14px;
+  font-size: 13px;
   min-height: 60px;
   display: flex;
   align-items: center;
@@ -110,7 +131,7 @@
 }
 
 .slot-content {
-  padding: 12px;
+  padding: 10px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   min-height: 60px;
@@ -121,12 +142,12 @@
 
 .slot-subject {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   margin-bottom: 4px;
 }
 
 .slot-room {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.9;
 }
 
@@ -207,9 +228,44 @@
   box-sizing: border-box;
 }
 
-.modal-content .form-group input:focus {
+.modal-content .form-group input:focus,
+.modal-content .form-group select:focus {
   outline: none;
   border-color: #667eea;
+}
+
+.subject-select {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  box-sizing: border-box;
+  background: white;
+  cursor: pointer;
+}
+
+.no-subjects-message {
+  padding: 15px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  color: #856404;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.no-subjects-message p {
+  margin: 0;
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button:disabled:hover {
+  opacity: 0.5;
 }
 
 .modal-actions {
@@ -255,4 +311,90 @@
   min-height: 100vh;
   font-size: 18px;
   color: #666;
+}
+
+/* Dark Theme Styles */
+[data-theme='dark'] .dashboard-container {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .timetable-container {
+  background: #1a1a1a;
+}
+
+[data-theme='dark'] .timetable {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .timetable-cell {
+  border-color: #404040;
+}
+
+[data-theme='dark'] .timetable-cell:hover {
+  background: #353535;
+}
+
+[data-theme='dark'] .time-cell {
+  background: #252525;
+  color: #b0b0b0;
+}
+
+[data-theme='dark'] .empty-slot {
+  color: #666;
+}
+
+[data-theme='dark'] .modal-overlay {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+[data-theme='dark'] .modal-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .modal-content h2 {
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .modal-content p {
+  color: #b0b0b0;
+}
+
+[data-theme='dark'] .modal-content .form-group label {
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .modal-content .form-group input,
+[data-theme='dark'] .modal-content .form-group select {
+  background: #1a1a1a;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .modal-content .form-group input:focus,
+[data-theme='dark'] .modal-content .form-group select:focus {
+  border-color: #667eea;
+}
+
+[data-theme='dark'] .subject-select {
+  background: #1a1a1a;
+  border-color: #404040;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .cancel-button {
+  background: #404040;
+  color: #e0e0e0;
+}
+
+[data-theme='dark'] .loading {
+  color: #b0b0b0;
+}
+
+[data-theme='dark'] .no-subjects-message {
+  background: #3d2f00;
+  border-color: #ffc107;
+  color: #ffc107;
 }
